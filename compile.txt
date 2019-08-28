@@ -1,0 +1,9 @@
+Once inside src/ folder,
+
+COMPILE:
+
+javac -cp .:bcprov-jdk15on-160.jar *.java
+
+RUN:
+
+java -cp .:bcprov-jdk15on-160.jar DiffieHellman 

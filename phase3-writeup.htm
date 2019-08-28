@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CS 1653 Project P3 Writeup</title>
+  <style>
+/* BEGIN CHANGES HERE */
+
+/* In this section, you may add CSS styling if desired.
+ * Be sure your writeup still prints legibly. */
+header {
+  text-align: center;
+}
+
+/* END CHANGES HERE */
+  </style>
+  <body>
+    <header>
+      <h1>CS 1653 Project P3 Writeup</h1>
+      <h2>
+<!-- BEGIN CHANGES HERE -->
+
+George Meisinger, gem56@pitt.edu <br>
+Jonathan Zhang, jcz18@pitt.edu <br>
+Matt Stropkey, mas682@pitt.edu
+
+<!-- END CHANGES HERE -->
+      </h2>
+    </header>
+    <section id="overview">
+      <h2>Overview</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>In this section, broadly overview the types of cryptographic techniques that
+your group has decided to use to address threats T1â€“T4.</p>
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="threat1">
+      <h2>Threat T1: Unauthorized Token Issuance</h2>
+<!-- BEGIN CHANGES HERE -->
+<p>Threat T1 involves unauthorized token issuance. Currently, an adversary can log in
+ as another user simply by knowing the user's username. This gives a malicious client full control over the actual client’s permissions such as uploading files into groups the client can access.  Uploading files could be a huge issue as they could upload malicious files that could be harmful to other users, potentially giving them access to much more sensitive files or passwords such as banking information.  The malicious client could also download files that they were not given permission to access, but given they are in posing as someone else they now have access. To go even further, a malicious client could go on to group admin accounts and delete or remove members from a group.  They could also add in users to a group that the actual account belongs to. If the malicious client were to gain access to an admin account for the whole group server, they could potentially delete other users or add in new users that were not supposed to be added to the server. As you can see, with the current way the system is set up, a malicious client could do very harmful things to the server as well as potentially devastating things to the other clients within the server. </p>
+
+
+<p>Assuming that the group server is entirely trustworthy, we think the best way to go about ensuring that unauthorized tokens will be to use a login protocol that uses public key cryptography. Upon starting the group server, the admin would have to exchange public keys with the server.  
+To implement this for the project, we will create a file that stores all the users key pairs in a hash table that can be accessible via the client app, as well as a file that stores the group servers key pair in a file, just as the userlist is held for the server. 
+On the server, users public keys will be stored inside the userlist.  We know that storing each users key pair within a file like this would not be secure, but for the purposes of displaying how this would work we will implement it like this for now. 
+When using the keys in this manner, we would like the user to assume they do not have access to another user’s keys via the client app. Under an ideal situation, each user would hold their public and private keys somewhere secure where no one else could access them(except for their public key).  
+Upon starting the client app, the admins public key will be shared with the group server and vice versa. The only way to add a new user to the system is through the admin. In order to do this, a user will have to first give their public key to the admin. 
+When adding a new user to the server, the admin will share the user’s public key with the server as well as a username as long as it does not exist already.
+ When a user asks to login to the system, the server will send the user a challenge(just a random number).  
+ The user will then send back the challenge encrypted with their private key. The server will then decrypt the value that the user sent back by decrypting it with their public key. Once the server authenticates the user, they can then issue a token for the user by first encrypting it with the users public key and then with the servers public key. By issuing the token in this manner, the group server essentially authenticates itself as it lets the user know only the group server could have issued this token. The algorithm that we will use is RSA with 2048 bit keys. </p>
+
+<img src="t1.png" alt="User authentication">
+<p>We believe that using public key crypto in this manner properly addresses the issue of a user getting access to an unauthorized token for several reasons.  The first is that it is hard to factor so figuring out someone's private key will be very hard. Given this, the only way to get the value of the challenge to match what was sent when decrypted with the user’s public key is if they encrypted it with their private key.  Thus, it is probably safe to assume that no one is impersonating the user and they are who they claim to be. This also deals with the issue of if someone were to infiltrate the group server because the only thing that the group server will store is a client’s public key, which will not allow someone to login impersonating that user.  An adversary also could not gain a client’s private key by listening in on the channel. The only possible way to gain the client’s private key is via the client. Note that to actually implement this for our project, just create a public/private key for a user when they are added to the system instead of pre generating keys for users. </p>
+
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="threat2">
+      <h2>Threat T2: Token Modification/Forgery</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>Threat T2 involves unauthorized modification or forgery of user tokens. Since the token includes a list of groups that a user belongs to malicious user might attempt to add new groups into that list, therefore giving them access to that group and the files available to that group. Access to that group and those files means that the user can upload or download additional files into the file server for that group even if they should not have such permission.  </p>
+
+<p>In initial server setup, the group server will generate a random 2048 bit private-public key pair. The private key will be stored in the group server while the public key is stored in the file servers when they are being created by the admin. In order to ensure that the token has been unmodified, the group server, when distributing a token, will translate the token into a string to be input into a hash function. This will be done by taking the name of the issuer of the token, the subject, and the list of groups of the token. The strings will be concatenated in the following form: 
+Issuer || Subject || Number of Groups || #0 GroupName || #1 GroupName … || #n GroupName
+The value returned will then be signed by the group server’s private key and then appended to the token and the token can then be sent to the user. When the group server or file server reads the token, the checksum in the token will be decrypted using the public key stored on the file server and the new checksum will be calculated of the token’s contents. If the checksums are different, then the request is invalidated and the group or file server will send a message indicating that the token has been tampered with and thus all operations are invalid until logging out and logging back in. </p>
+
+
+<p>This protocol is secure because the only way to generate a correct checksum is to have the private key, which is only available on the group server. If the user attempts to modify the the raw data and checksum by decrypting it, then there is no possible way to encrypt it as the private key is stored on the secured group server and using the public key will result in the file server decrypting and reading an entirely different value. If the values have not been modified, then the calculated checksum will equal the stored one when decrypted using the public key and thus the system can be assured that the token refers to the same user. A forged token requires knowing the private key which can only be found in the group server, which according to the trust model is secured and thus cannot be directly known without brute forcing each 2048 bit key. </p>
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="threat3">
+      <h2>Threat T3: Unauthorized File Servers</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>Threat 3 involves authorization of file servers. Currently there is no way for a client to be sure the file server they are connecting to is the one they expect. This could lead to a malicious server impersonating a file server stealing a user token or sending malicious software to clients.</p>
+
+<p>In order to authenticate file servers, we will implement public key cryptography. File servers will generate a 2048 bit RSA key pair. The first time a client connects to a file server, after establishing a symmetric key as described in T4, the server will send its public key to the client. It will be up to the client to verify this key with an administrator. The client application will store the keys for servers it has connected to in the past. Upon connecting to a server, the server's public key is sent to the client and compared to the cached key. If the key has changed, the connection will be refused. If the server's public key is found, the client will use it to encrypt a challenge and send the challenge to the file server. The server will decrypt this challenge and send it to the client to complete the authentication.</p>
+<img src="t3.png" alt="File Server Authentication">
+<p>This protocol is secure because it requires knowledge of both the server's public key for initial identification, as well as the server's private key for confirmation. Therefore, even if an adversary were able to acquire the server's public key, they would not be able to successfully decrypt the challenge from the client. The challenge is also secured by the solution to Threat 4, as the adversary would have to first decrypt the information being transmitted before attempting to figure out either the public or private keys. </p>
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="threat4">
+      <h2>Threat T4: Information Leakage via Passive Monitoring</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>Threat 4 involves information leakage via passive monitoring. Because communications between clients and servers are unencrypted, it is possible for an adversary to gain unauthorized information. This could include stealing user tokens, passwords or file contents, and could lead to a man in the middle or replay attack. This would allow a malicious adversary to easily read and access another user’s files or groups since the information can be intercepted and stored to be used in later offline and online attacks.</p>
+
+<p>In order to prevent passive monitoring, we will encrypt all communications between servers and clients. We will use the Diffie-Hellman protocol to securely transmit a shared session key. When a client wants to connect to any server, they will first use a secure random number generator to generate two 256 bit probable primes p and q. They will then generate a public/private key pair using the Diffie-Hellman protocol. The client then sends p, q and their public key to the server. The server uses p and q to create their own key pair, and sends the public key to the client. At this point both parties can generate the shared secret. They will then generate a SHA-256 hash of this secret to be used as the symmetric key.</p>
+<img src="t4.png" alt="Diffie-Hellman">
+<p>Now that we have a symmetric key, the client will use AES 256 bit in CBC mode to encrypt messages. The IV will be generated by a secure random generator, and prepended to the ciphertext.</p>
+
+<p>This protocol is secure because the shared secret is transmitted in a secure way. The Diffie-Hellman protocol ensures that an adversary cannot easily guess the secret. The security of this shared secret is reinforced by using a cryptographically secure hash of the secret as the symmetric key. We generate a random IV and send it as plaintext, which is secure as long as the IV is generated by a secure random generator. With a secured 256 bit symmetric key, as well as random IV, AES encryption can be used to secure all traffic.</p>
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="discussion">
+      <h2>Discussion</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>The largest element within the four solutions discussed above is the usage of private key cryptography, as the difficulties associated with them are can be safely mitigated due to how the trust model was established. Since the group server is completely secure and authenticated or actual file servers are also completely secure, the dangers of storing the private keys are much smaller than in a trust model where an adversary could attack the servers themselves. Passive middlemen cannot modify the transmissions between clients and servers and thus it can be assumed that private and public key distribution will also have no errors. One alternate solution to the four threats was to use a separate security server akin to Kerberos, and have that deal with token authentication and file server authentication.  We contemplated using symmetric key over a public key algorithm but there are some benefits to using public key. The main benefit of public key over symmetric key is that if we used symmetric key, we would still need some way to exchange the key securely, which would most likely end up being public key. </p>
+
+<p>If your group did any extra credit, please discuss that in this section, as
+well.</p>
+
+<!-- END CHANGES HERE -->
+    </section>
+  </body>
+</html>
+
+

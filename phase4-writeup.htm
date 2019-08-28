@@ -1,0 +1,173 @@
+ and reorder<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CS 1653 Project P4 Writeup</title>
+  <style>
+/* BEGIN CHANGES HERE */
+
+/* In this section, you may add CSS styling if desired */
+header {
+  text-align: center;
+}
+
+/* END CHANGES HERE */
+  </style>
+  <body>
+    <header>
+      <h1>CS 1653 Project P4 Writeup</h1>
+      <h2>
+<!-- BEGIN CHANGES HERE -->
+
+George Meisinger, gem56@pitt.edu <br>
+Jonathan Zhang, jcz18@pitt.edu <br>
+Matt Stropkey, mas682@pitt.edu
+
+<!-- END CHANGES HERE -->
+      </h2>
+    </header>
+    <section id="overview">
+      <h2>Overview</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>	The major theme for dealing with these three threats was to add additional information to the parts of the system
+	that according to the security model are secure, mainly the group server, the token that it gives, and properly 
+	authenticated users. T5 adds additional information to the messages being sent from the user application to both 
+	communications with group and file servers, and T7 adds an additional field to the token that prevents tokens from
+	stolen. T6 adds an additional layer of security by having the group server send keys that the user application can 
+	use to secure their files once authenticated.</p>
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="threat5">
+      <h2>Threat T5: Message Reorder, Replay, or Modification</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>Threat 5 involves an active attacker capturing messages between a client and server. The attacker can use these messages in several ways. For example, they could save 
+these messages for use in a replay attack. Even without knowing the contents of a message, they could make educated guesses at what these messages are doing. This can lead to 
+a man-in-the-middle-attack where the attacker reorders or modifies messages. For example, an attacker may recognize a large message as a file upload and arbitrarily modify the 
+contents with the goal of corrupting the file.</p>
+
+<p>In order to prevent these attacks, we will begin by appending some critical information to our messages. In order to prevent replay attacks, we will append a timestamp to each 
+message during a session. The message will then be valid for a maximum of 5 minutes. We will leverage a similar strategy to prevent message reorder. Each message will simply contain 
+a session ID number, an integer value representing its place in the sequence. The first message sent from the client will have an ID of 0. The client will then be expecting a response with 
+an ID of 1. The protocol will continue in this fashion, with each message incrementing the session ID. These approaches are fairly simple, so in order to make them truly effective we will 
+use HMACs in each message to protect integrity. After the initial Diffie-Hellman exchange, we have established a shared secret between client and server. We will first expand this secret into two 
+symmetric keys. This is done by simply chopping the shared secret (which is 512 bits) into two 256 bit keys. We will use one of these keys for AES encryption (K<sub>s</sub>), and
+one will be used in HMACs (K<sub>h</sub>). Our HMAC will be a SHA-256 hash of the message (including timestamp and session ID) concatenated with the HMAC key.</p>
+
+<p>Messages will be encrypted as follows: <br> {Message, timestamp, session ID}K<sub>s</sub>, HMAC <br></p>
+
+<p>This protocol ensures both message integrity as well as freshness. Even if the attacker were able to modify the timestamp or session ID of a message, they would not be able to generate 
+a valid hash without knowledge of the session key. To return to our previous example, an attacker could modify a file upload but cannot generate a valid HMAC. In this case, the file upload 
+would fail and the user would be notified of a potential attack. Any message with an invalid timestamp or session ID would be dealt with in the same fashion.</p>
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="threat6">
+      <h2>Threat T6: File Leakage</h2>
+      
+      <p>Since file servers are untrusted, there are no guarantees to the security of the file against attackers. 
+      These attackers may have physical access to the machine running the file server, remote access by being an administrator, or just a third party that can attack the server. 
+      Whatever the case, if the file server cannot be trusted to safely store files, then files that a user uploads or downloads may be modified at will by outside adversaries. 
+      Files may be modified so that they do not appear in the user’s file lists or contain malicious code or data without any authorized users knowing about these changes. 
+      Any confidential or private information that may be on these files can easily be compromised by adversaries reading the files themselves. 
+      File confidentiality is at risk under the system that is currently in place for uploading, downloading, and listing files.</p>
+      
+      <p>When a group is created, the group server shall create an initial 256 bit AES symmetric key for that group and an
+	  initial integer value to be used as the version control.When users are added or removed from a group, a new 256 AES 
+	  symmetric key will be created and the initial integer value will be incremented.
+      Once the new key is recomputed, upon logging in the group server will send that newly generated key 
+	  and the integer value to the user. Deprecated key and version pairs will be stored, 
+	  but all file uploads afterwards will use the newly generated key. The list of the current key-version pair 
+	  and all deprecated key pairs will be sent to the user application, which will hold a seperate list 
+	  of these keys to encrypt and decrypt files. When a user is removed from the group, 
+	  the key-version pair will be regenerated using the same steps. When a file upload happens, 
+	  the user application will generate a random IV and use the symmetric key to encrypt the file and the version value 
+	  using CBC mode before sending the encrypted file, the encrypted version number, the unencrypted integer, and the IV.
+      When a file download happens, the user application will match the key to the unecrypted version 
+	  value and decrypt the integer with their current key to ensure that they are the same, after which the 
+	  key and IVwill be used to decrypt the file after downloading it. If the integer values do not match, i.e. 
+	  the pairs are incorrect, the application will return a failure message stating that they do not have 
+	  the correct version-key matching.
+      It is up to the users to download/re-upload files if a user is removed from the group to ensure confidentiality.
+	  The IV used is randomly generated and stored in the file server unencrypted when an upload happens.</p>
+      
+      <p>This protocol ensures backwards secrecy for groups while maintaining data confidentiality for the files themselves. 
+      The files themselves cannot be read without knowing the symmetric key, and if the encrypted file is modified then the decryption will fail altogether and the file will be dead, 
+      but according to the trust model file availability is not an issue. 
+	  The random IV ensures that no information can be gained from viewing the encrypted files.
+      If a user is removed from the group, then their symmetric key can only be used for an extremely limited amount of time before all files that they previously could read are 
+      re-encrypted with the newly generated one. Additionally, the group server will no longer give the user the keys for the group, both the most current and deprecated keys, meaning
+	  that the user would have to save their most recent key list offline in order to decrypt older files that have not been written to.
+	  The main reason for having not having forward secrecy is that adding a user to a group usually means that they are trusted enough to see all files of available to that group,
+	  and that seperation of user privileges or files can be done through making different groups and storing files in those groups rather than all files in a single group.
+	  </p>
+<!-- BEGIN CHANGES HERE -->
+
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="threat7">
+      <h2>Threat T7: Token Theft</h2>
+<!-- BEGIN CHANGES HERE -->
+  
+  <p>The threat T7 deals with the threat of a token theft by the file server.
+  Currently, if a user sends their token to a server, there is no way for the server to know if that token belongs to the user who sent it.
+  This can cause some very serious issues within the system.
+  If the file server were to steal the token used by one of its clients to pass it off to another user, that user could use the token to impersonate the other actual user.
+  The main concern with this is that it could allow a user to upload files to a group they do not belong to, as well as downloading files from a group that they do not belong to.
+  Uploading files could be particularly harmful if the user were to upload a malicious file that everyone in the group thought was safe to download.
+  If a user were to upload a malicious file that gave them access to another user’s computer, they could potentially gain information such as any private or symmetric keys that a user may have.
+  If the malicious user were to gain the users private key, they could use this to authenticate to the application allowing them to do anything that the actual user is allowed to do such as add users to a group, delete users from a group, or list the members of the groups that the user belongs to.
+  If the user that they attacked is an admin, this could be catastrophic to the whole system.
+  The user could add or delete users from the system, add themselves to the admin group, and even delete the admin from the group if there is still one admin in the group, being the malicious user most likely.
+  With a stolen token the malicious user could also steal information that was not supposed to be public by downloading files from the groups that the actual user belongs to. </p>  
+  
+  <p>To deal with this threat, we think the best way to go about this is to add the servers RSA 2048 bit public key to the token.
+  Currently, when a user starts running the application, they are required to give the public key of the file server that the application will connect to so the application can verify that the file server does have the private key to this public key.
+  Once connected, all users who login will be asked if they recognize the public key of the server and would like to continue prior to logging in.
+  Thus, after a user verifies that this is the file server they want to use, we can have the group server place the file server’s public key inside the token.
+  The group server will not hold the public key of the file server.
+  It will have to receive it from the user, who will pass to the group server the file server’s public key that they want their token to be used on.
+  The file servers public key will then be converted to a byte array and appended to the string that was previously sent into the SHA-256 hash algorithm to get a checksum for the token.
+  Now this newly formed string will get hashed to create the checksum of the token, which will be signed by the group server using the group servers private RSA key. </p>
+  
+  <p>When a file server receives the token, it will first have to check that the token was in fact created by the group server and not changed by taking the hash of the toString method of the token concatenated with its own public key byte array.
+  If the value matches the checksum that was signed by the group server, it has been confirmed that the token was not altered.
+  The file server will then have to check to see if the file server key that the token holds matches its own public key.
+  If the keys match, then the token was intended to be used on this file server.
+  If the key does not match, then the token was not supposed to be used for this file server.
+  Thus, a user cannot use a stolen token at a non-malicious file server as it will recognize that the token was not supposed to be used on this server so deny access.
+  If the token was altered in any way, such as changing the file servers public key that is stored in the token, the file server will be able to see that the checksum does not match so the token is invalid.  </p>
+  
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="discussion">
+      <h2>Discussion</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>	The group server and user application do much more than the file servers do for this phase, which makes sense since the only
+	part that is truly secure under the security model is the group server. The user application does security work between the 
+	user and file servers, meaning that malicious attackers have to focus on a more trusted application compared to the file servers,
+	which are completely untrustworthy. Forward secrecy was originally planned for T6, but upon further review of what file sharing
+	applications usually do this was discarded as being too unnecessarily secure and potentially leading to data loss. T7 builds upon
+	what was done in T2 and modifying the token to ensure integrity. </p>
+
+	<p>The solutions for T5-T7 do not drastically change what was done in T1-T4, but instead build upon existing systems or 
+	do completely separate and individual security operations that do not affect what was previously done. This means that 
+	if the solutions that were proposed and implemented in phase 3 were already correct then the additional solutions in this
+	phase do not compromise the security of the system and thus the security of the previous solutions. T5 changes T4 by increasing
+	what the Diffie-Hellman exchange creates but does not modify the T4 protocol beyond that. T6 is completely user application side,
+	and thus none of the phase 3 solutions are affected. T7 adds an additional field that will be added to the calculation for T2
+	checksum, but does not change how the checksum is calculated or the protocl for checking for token integrity.</p>
+
+<p>If your group did any extra credit, please discuss that in this section, as
+well.</p>
+
+<!-- END CHANGES HERE -->
+    </section>
+  </body>
+</html>
+

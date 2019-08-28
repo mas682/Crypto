@@ -1,0 +1,47 @@
+FileSharing Usage Information
+
+USAGE:
+ To start Group Server: java RunGroupServer [(optional) port number]
+ When the group server is first started, there are no users or groups. Since 
+ there must be an administer of the system, the user is prompted via the console
+ to enter a username. This name becomes the first user and is a member of the
+ ADMIN group.  Also, no groups exist.  The group server will by default
+ run on port 8765, but a custom port can be passed as the first command line
+ argument.
+
+ To start the File Server: java RunFileServer [(optional) port number]
+ The file server will create a shared_files inside the working directory if one 
+ does not exist. The file server is now online.  The file server will by default
+ run on port 4321, but a custom port can be passed as the first command line
+ argument.
+
+ To reset the File server completely, delete FileList.bin and the shared_files 
+ directory.
+ To reset the Group Server, delete UserList.bin.
+ 
+ Note that this implementation supports server side directories.
+
+TO USE THE CLIENT APPLICATION:
+	
+	java MyClientApp [groupClient serverName] [groupClient serverPort] [fileClient serverName] [fileClient serverPort]
+	or no arguments just runs it locally
+
+Commands are displayed upon a successful login.
+
+Menu:
+
+	1. Create a new user
+	2. Delete a user
+	3. Create a group
+	4. Add user to a group
+	5. Remove a user from a group
+	6. Delete a group
+	7. List members of a group
+	8. Upload a file to a group
+	9. Download a file
+	10. Delete a file
+	11. Display my files
+	0. Quit
+
+Each operation is performed by inputting it's corresponding option number.
+The user will be prompted for additional input if necessary.

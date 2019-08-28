@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CS 1653 Project P5 Writeup</title>
+  <style>
+/* BEGIN CHANGES HERE */
+
+/* In this section, you may add CSS styling if desired */
+header {
+  text-align: center;
+}
+
+/* END CHANGES HERE */
+  </style>
+  <body>
+    <header>
+      <h1>CS 1653 Project P5 Writeup</h1>
+      <h2>
+<!-- BEGIN CHANGES HERE -->
+
+George Meisinger, gem56@pitt.edu <br>
+Jonathan Zhang, jcz18@pitt.edu <br>
+Matt Stropkey, mas682@pitt.edu
+
+<!-- END CHANGES HERE -->
+      </h2>
+    </header>
+    <section id="overview">
+      <h2>Overview</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>
+Each threat violates an assumption that was previously assumed to be true in the previous 
+phases of the project. These threats have either the adversary attack the system directly or
+use information within it to attack individual users, whether it be their files or their groups.
+In any case, these attacks rely on either having direct access to a server or executing some 
+third party program on these servers in order to gain unauthorized access. The countermeasures 
+created were designed to mitigate the damage if such attacks were realized, but ultimately the
+solutions cannot offer full and complete security against such threats, as adversaries can always
+brute force to break keys and encryption.
+</p>
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="Threat Model One">
+      <h2>Threat Model 1</h2>
+<!-- BEGIN CHANGES HERE -->
+
+	One particular threat that has not been addressed in previous models is a denial of service attack.
+	This threat can reduce or completely prevent the availability of either the group server or file servers
+	by spamming requests to the server. Since the servers must check for correctness of the data being sent 
+	by malicious users before denying and going to the next request, an adversary can send junk data that 
+	might structually appear to be correct enough that the servers have to actually check the data before 
+	denying the request as a fail. Requests are handled in a FIFO manner, which means that legitimate clients
+	who send correct requests will have to wait for all of the malicious requests ahead of them before the server
+	can handle it, increasing the amount of time a user has to wait for the request to go through.
+</p>
+	
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="Attack one">
+      <h2>Attack 1</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>
+	The first threat can be easily carried out by having a large number of machines or parallelizable hardware
+	that can create "valid" requests. Since the vast majority of the crypto used for this project was public key
+	or asymmetric, when a request comes in for a token for a user, the group server must generate a random challenge
+	and use public key cryptography to decrypt the challenge response in order to authenticate that the request is valid. 
+	The attack can just simply have each of these machines spam requests to login, wait for the server to generate and 
+	send back the challenge, then randomly generate that the group server must decrypt before simply disconnecting and 
+	creating another request. The group server thus must keep generating these challenges and decrypt the responses
+	before recognizing that these challenges do not match and the request can be denied, at which point another request 
+	to login is created. For file servers, a similar approach can be done where somewhat believable junk is sent as the token
+	and the file server must check each token for correctness before denying the request; token checking is admittably less 
+	harder than public key crypto to decrypt the challenge, but nevertheless enough requests can still flood the server.
+	This attack threatens the availability of the servers to be able to process requests of legitimate users or clients
+	who are forced to wait for these bogus ones to finish before finally getting their request through. If clients wait too long
+	because of this denial of service, they may not want to use the application anymore.
+</p>
+
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="Countermeasure one">
+      <h2>Countermeasure 1</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>
+	One countermeasure available to prevent this threat is for the server to generate an initial puzzle that the client or
+	requester must solve before the server will handle the actual request. One particular puzzle that can be created is to 
+	find the inversion of a hashed value, that is, given a H(x), where H is the hash function and x is the original value, find x.
+	This puzzle is hard to solve but easy to generate and check, which will stop spam requests since the server 
+	will not do expensive computing before the requester or user also does expensive computation. It is trivial to generate a random 
+	bit value for x and then put that value into a hash function to generate the puzzle. Checking if the answer is correct is done by
+	seeing if the returned x is the same as the stored x. This puzzle can be generated by the server by creating a random value, whether it be
+	random bits or English text, and then putting it through SHA-256. The value, hashed(value) pair can be stored and the hashed value is 
+	sent back to the application when a request is made, after which the client must solve the puzzle and send it back to the server. 
+	The server, upon getting the solution, can check the stored value and if they match then the initial request can be handled, otherwise
+	the request is discarded. Additionally, if an answer is not found within a specific timeframe, the request can be denied to free up memory.
+	This forces requesters to do some hard computation that also requires time to do before having the server do computations, thus creating a 
+	gap of time that the server can use to handle other requests that have actually been validated. 
+	
+</p>
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="Threat model two">
+      <h2>Threat Model 2</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>
+	Another threat that has not been entirely addressed is unauthorized file modification or a violation in file 
+	integrity. Previous threat models have dealt with primarily securing file confidentiality or preventing adversaries
+	from seeing the file's contents, not its integrity. File servers are inherently untrusted, and as such people who gain
+	access to the file server can modify the contents of the files even if they cannot read or understand what is exactly being
+	changed. This means that when a user downloads that modified file, the client application will attempt to decrypt a file that
+	will ultimately return garbage because of the modifications. Additionally, if the file server is compromised, then an attacker
+	can modify at will the meta data of files since those are not encrypted, meaning that key versions and the encrypted key version
+	can be changed so that downloading fails because the application will incorrectly match the keys and the decrypted-encrypted value.
+</p>
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="Attack two">
+      <h2>Attack 2</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>
+	The second threat can be done by simply having access to the machine that the file server is being run on. If this adversary
+	is the system admin or an otherwise authorized user, then they can easily access the meta data of the file server or the files 
+	themselves within the shared_files.bin file. A third party could gain access to the system through either social engineering on
+	an authorized person to give control or by infecting the machine using malware, whether that be a virus or trojan horse. Once access
+	is obtained, it is trivial to edit the files, the key version of those files, and the groups that those files are associated with.
+	File modification cannot have much meaningful impact as the files are stored encrypted, but modifying them can corrupt the actual 
+	contents within, thus preventing a file from being "available" to be used. Changes to the key versions or encrpyted versions are more
+	meaningful as that data is not encrypted, but nevertheless the end result is prevention of file download or decryption. 
+</p>
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="Countermeasure two">
+      <h2>Countermeasure 2</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>
+	A counter measure to provide an integrity check on the files stored on the file server would be to have a HMAC that is taken from
+	the actual file and the key version that is used, and the actual key used to encrypt the file.  This will be appended to
+	the end of the unencrypted file.  All of this will then get encrypted using the correct key and placed on the file server.   We
+	would need to generate a new 256-bit AES symmetric key that would be used for the HMAC, that everyone who is added to the 
+	group would have access to. Upon downloading a file, you would first decrypt the file, and then take the HMAC of the actual file,
+	along with the key version number and the key used to encrypt the file to see if this matches the HMAC that was
+	stored with the file.  This should give an integrity check because if a user were to change the encrypted file,
+	the HMAC would not match given they could not produce one that should match the one that should be 
+	generated as they do not know the key to use for the HMAC.  One issue that could occur that is not address is that a removed 
+	user could still alter files if they were to somehow gain access to the files on the file server.  If a file was encrypted 
+	with a key that they may have previously had, they could potentially alter the file and generate the HMAC given that they 
+	know the key the file is encrypted with and the key to generate the HMAC.  This will prevent users who have never been in the group
+	from altering the file, such that it will become useless as they will not know what they are changing given it is encrypted. 
+
+
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="Threat Model three">
+      <h2>Threat Model 3</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>
+	A threat that has yet to have been addressed in previous threat of an adversary being able to access the files stored on the group server,
+	thus giving them the ability to change the files as they wish.  Up to this point, 
+	we have assumed that the group server is entirely secure, but suppose it were not.  If the group server were
+	not entirely secure, an adversary could alter any file with ease as they are not encrypted in any way, nor do they have any sort
+	of integrity check.  This could result in the adversary adding themselves to the user list,
+	changing the stored public keys within the system that users use to login, and alter who is in what group.  The
+	purpose of adding themselves to the system could be so they could them add themselves to a group such as admin and 
+	do whatever an admin could do.  The reason to change a users public key
+	that is stored on the group server would be to deny them access, or so you could pretend to be that user.   
+</p>
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="Attack three">
+      <h2>Attack 3</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>
+The threat of an adversary being able to alter the files which are stored on the group server can be done if the adversary were to have access to
+the machine that the group server is being run on.  If the adversary had access to the machine that the group server was being run
+on, they could easily access UserList.bin and GroupList.bin.  They could also potentially access the files by either doing a social
+engineering attack on the user to gain their login information, or by infecting the machine using malware or some other computer
+virus.  Once access to the machine is obtained, the file UserList.bin can be altered to add the adversary to the user list along
+with a public key for which they have the private key to.  The list could also be altered so that the public keys of other specific
+users already in the user list are altered so they could be denied service, or so that the adversary could pretend to be them, given
+that our system only requires a username and a RSA key pair to log in.  The group list file could be altered such that users are 
+removed from their respective groups, or added to groups, including new users that the adversary may have added in.  For example, the
+adversary could add themselves to the admin group so that they could have all the permissions that an admin would have in the system. 
+</p>
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="Countermeasure three">
+      <h2>Countermeasure 3</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>
+To prevent such an attack in which an adversary can alter the files stored on the group server, we will generate a hash of the files each 
+time they are saved and sign it with the group servers private key, assuming that the adversary cannot gain 
+access to the group servers private key.  For the UserList.bin file, we would get the toString 
+of the userList hash table by calling the hash table toString method.  We would then append the 
+toString output of the user hash table, which holds users public keys.  We would then convert then string 
+into a byte array and take a SHA-256 hash of it.  After generating the hash, the group server will use it's 
+private key to sign this hash so that it can later verify that it was not altered.  We would do the 
+exact same process for the GroupList.bin file, by just taking the hash of the groupList hash table 
+after it has been converted to a string.  Upon starting up the group server, it will first verify that 
+no one has changed the file since it was last changed by verifying the signature.  If the signature is 
+not verifiable, then the file cannot be used as someone else in the system has altered the file.  Every 
+time that an autosave occurs or any time the client application alters one of these files, this process will 
+occur again.This is assuming the servers private key is entirely protected, meaning the adversary does not 
+have access to it, and the adversary is attacking the program from an account other than the user running the group server.
+</p>
+
+
+<!-- END CHANGES HERE -->
+    </section>
+    <section id="discussion">
+      <h2>Discussion</h2>
+<!-- BEGIN CHANGES HERE -->
+
+<p>Conclude with a paragraph or two discussing your threat model and
+countermeasure mechanisms. How realistic is your threat model for a real-life
+file sharing system? Comment on the design process that your group followed. Did
+you discuss other ideas that didn't pan out before settling on the
+above-documented approach? Did you design attacks that you were unable to
+mitigate, or that you think are impossible to mitigate? Use this space to show
+off your hard work!</p>
+
+<p>
+This part of the project was actually pretty challenging to come up with ideas
+to attack the system as we have covered a lot of the simpler ideas.  It honestly 
+took us a lot of brainstorming to come up with vulnerabilities within the system.  
+For a moment we thought about considering the group server as completely compromisable 
+but this causes some major issues as if the group server keys were compromisable, then 
+any adversary who compromises it could generate their own tokens at will, and essentially 
+cripple the whole system by changing the private key of the group server so that no one 
+could ever use a file server.  We also contemplated a way in which we could do a brute force 
+attack to login but this would be very challenging for an adversary given that to login, you 
+must sign a random number with a users private key.  Therefore, you could try to generate every 
+possible signed random number but it would change every time you go to login thus, it is nearly 
+impossible to use a brute force attack to login.  We also considered a way in which we could 
+prevent the file server from deleting files, but this would also be very hard to accomplish.  
+The best idea we could come up with was potentially having a backup file server in which if 
+a file was not supposed to be deleted, we could just pull it from there.  The server would have 
+to be backed up every so often, but the back up could also potentially become compromised.
+</p>
+
+<p>Finally, spend a paragraph discussing the interplay between the
+countermeasures for your proposed attacks and your techniques for mitigating
+threats T1-T7 from Phases P3 and P4 of the project. Did you have to design your
+countermeasures in a particular way so as not to re-introduce these older
+threats?</p>
+
+<p>
+The second threat kind of deals with T1 as this is in a way dealing with unauthorized 
+tokens, but they would be unauthorized as a user has slipped into the system.  This 
+also deals with T2 because a user could potentially modify their token to give themself 
+additional permissions.  The second threat kind of deals with T6 as it is somewhat of an 
+expansion, but it is just preventing the use of an altered file.  The first threat we 
+proposed really did not have much to do with the other previous threats but it will help 
+keep the system from going down due to too much traffic being sent at once.
+</p>
+
+
+
+<!-- END CHANGES HERE -->
+    </section>
+  </body>
+</html>
+
